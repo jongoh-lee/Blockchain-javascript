@@ -40,11 +40,32 @@ Blockchain.prototype.getLastBlock = function(){
 
 //트랜잭션 추가
 Blockchain.prototype.createNewTransactions = function(amount, sender, recipient){
+    //사용자가 충분한 잔고가 있는지 조회 > amount가 balance 보다 많아야만 입력 가능
+    // const addressTransactions = [];
+	// this.chain.forEach(block => {
+	// 	block.transactions.forEach(transaction => {
+	// 		if(transaction.sender === address || transaction.recipient === address) {
+	// 			addressTransactions.push(transaction);
+	// 		};
+	// 	});
+	// });
+
+	// let balance = 0;
+	// addressTransactions.forEach(transaction => {
+	// 	if (transaction.recipient === address) balance += transaction.amount;
+	// 	else if (transaction.sender === address) balance -= transaction.amount;
+	// });
+
+    // if(balance >= amount){
+    //     res.json({
+    //         note: "Amount is more than Balance"
+    //     })
+    // }
     const newTransaction = {
         amount:amount,
         sender: sender,
         recipient: recipient,
-        tranactionId: uuid.v1().split('-').join(''),
+        transactionId: uuid.v1().split('-').join(''),
     }
     return newTransaction
 }
@@ -100,5 +121,56 @@ Blockchain.prototype.chainIsValid = function(blockchain){
     if(!correctNonce || !correctHash || !correctPreviousHash || !correctTransactions) validChain = false
 
     return validChain
-}
+};
+
+
+//Block explorer Method
+Blockchain.prototype.getBlock = function(blockHash){
+    let correctBlock = null;
+    this.chain.forEach(block => {
+        if(block.hash === blockHash) correctBlock = block
+    });
+    return correctBlock
+};
+
+Blockchain.prototype.getTransaction = function(transactionId){
+    let correctTransaction = null;
+    let correctBlock = null;
+    this.chain.forEach(block => {
+        block.transactions.forEach(transaction => {
+            if(transaction.transactionId === transactionId) {
+                correctTransaction = transaction;
+                correctBlock = block
+            }
+        })
+    });
+    return {
+        correctTransaction,
+        correctBlock
+    }
+};
+
+Blockchain.prototype.getAddressData = function(address) {
+	const addressTransactions = [];
+	this.chain.forEach(block => {
+		block.transactions.forEach(transaction => {
+			if(transaction.sender === address || transaction.recipient === address) {
+				addressTransactions.push(transaction);
+			};
+		});
+	});
+
+	let balance = 0;
+	addressTransactions.forEach(transaction => {
+		if (transaction.recipient === address) balance += transaction.amount;
+		else if (transaction.sender === address) balance -= transaction.amount;
+	});
+
+	return {
+		addressTransactions: addressTransactions,
+		addressBalance: balance
+	};
+};
+
+
 module.exports = Blockchain;

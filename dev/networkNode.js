@@ -29,7 +29,7 @@ app.post('/transaction', function (req, res) {
 
 //새로운 트랜잭션을 모든 노드에 배포 후 > pending에 등록
 app.post('/transaction/broadcast', (req, res) => {
-    const newTransaction = bitcoin.createNewTransactions(req.body.sender, req.body.amount, req.body.recipient);
+    const newTransaction = bitcoin.createNewTransactions(req.body.amount, req.body.sender, req.body.recipient);
     
     //내 펜딩 리스트에 추가
     bitcoin.addTransactionToPenddingTransactions(newTransaction);
@@ -213,6 +213,92 @@ app.post('/register-nodes-bulk', (req, res) => {
     res.json({
         note: 'bulk registration successful'
     })
+});
+
+
+//블록 콘센서스
+app.get('/consensus', (req, res) => {
+    const requestPromises = [];
+    bitcoin.networkNodes.forEach(networkUrl => {
+        const requestOptions = {
+            uri: networkUrl  + '/blockchain',
+            method: 'GET',
+            json: true
+        };
+        requestPromises.push(rp(requestOptions));
+    });
+
+    Promise.all(requestPromises)
+    .then(blockchains => {
+        //내 체인의 길이
+        const currentChainLength = bitcoin.chain.length;
+        
+        let maxChainLength = currentChainLength;
+        //새로운 체인 변수
+        let newLongestChain = null;
+        let newPendingTransactions = null;
+        
+        //내 체인을 모든 체인과 비교
+        blockchains.forEach(blockchain => {
+            if(blockchain.chain.length > maxChainLength){
+                maxChainLength = blockchain.chain.length;
+                newLongestChain = blockchain.chain;
+                newPendingTransactions = blockchain.pendingTransactions;
+            }
+        });
+
+        //내 체인이 가장 길거나, 긴 체인이 타당하지 않으면 교체 안함
+        if(!newLongestChain || (newLongestChain && !bitcoin.chainIsValid(newLongestChain))){
+            res.json({
+                note: "Current chain has not been replaced",
+                chain: bitcoin.chain
+            })
+        }else{
+            bitcoin.chain = newLongestChain;
+            bitcoin.pendingTransactions = newPendingTransactions;
+            res.json({
+                note: "This chain has been replaced",
+                chain: bitcoin.chain
+            })
+        }
+    })
+});
+
+
+//--------------------블록 탐색기-----------------
+
+//url에 요청하면 서버가 반환
+app.get('/block/:blockHash', (req, res) => {
+    // :blockHash은 req.params에서 조회 가능
+    const blockHash = req.params.blockHash;
+    const correctBlock = bitcoin.getBlock(blockHash);
+    res.json({
+        block: correctBlock
+    })
+});
+
+app.get('/transaction/:transactionId', (req, res) => {
+    const transactionId = req.params.transactionId;
+    const transactionData = bitcoin.getTransaction(transactionId);
+    res.json({
+        transaction: transactionData.correctTransaction,
+        block: transactionData.correctBlock,
+    })
+});
+
+app.get('/address/:address', function(req, res) {
+	const address = req.params.address;
+	const addressData = bitcoin.getAddressData(address);
+	res.json({
+		addressData: addressData
+	});
+});
+
+
+
+// --------------모르겠어요  block explorer
+app.get('/block-explorer', function(req, res) {
+	res.sendFile('./block-explorer/index.html', { root: __dirname });
 });
 
 app.listen(port, () => console.log(`listening on port ${port}...`))
